@@ -104,91 +104,17 @@ can use one of the repository functions in the `WORKSPACE` file to
 download Google Test and make it available in your repository:
 
 ```python
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
 http_archive(
     name = "gtest",
-    url = "https://github.com/google/googletest/archive/release-1.7.0.zip",
-    sha256 = "b58cb7547a28b2c718d1e38aee18a3659c9e3ff52440297e965f5edffe34b6d0",
-    build_file = "@//:gtest.BUILD",
+    remote = "https://github.com/google/googletest",
+    branch = "v1.10.x",
 )
 ```
 
-**NOTE:** If the destination already contains a `BUILD` file, you can leave
-out the `build_file` attribute.
 
-Then create `gtest.BUILD`, a `BUILD` file used to compile Google Test.
-Google Test has several "special" requirements that make its `cc_library` rule
-more complicated:
-
-*  `googletest-release-1.7.0/src/gtest-all.cc` `#include`s all of the other
-   files in `googletest-release-1.7.0/src/`, so we need to exclude it from the
-   compile or we'll get link errors for duplicate symbols.
-
-*  It uses header files that are relative to the
-`googletest-release-1.7.0/include/` directory  (`"gtest/gtest.h"`), so we must
-add that directory to the include paths.
-
-*  It needs to link in `pthread`, so we add that as a `linkopt`.
-
-The final rule therefore looks like this:
-
-```python
-cc_library(
-    name = "main",
-    srcs = glob(
-        ["googletest-release-1.7.0/src/*.cc"],
-        exclude = ["googletest-release-1.7.0/src/gtest-all.cc"]
-    ),
-    hdrs = glob([
-        "googletest-release-1.7.0/include/**/*.h",
-        "googletest-release-1.7.0/src/*.h"
-    ]),
-    copts = [
-        "-Iexternal/gtest/googletest-release-1.7.0/include",
-        "-Iexternal/gtest/googletest-release-1.7.0"
-    ],
-    linkopts = ["-pthread"],
-    visibility = ["//visibility:public"],
-)
-```
-
-This is somewhat messy: everything is prefixed with `googletest-release-1.7.0`
-as a byproduct of the archive's structure. You can make `http_archive` strip
-this prefix by adding the `strip_prefix` attribute:
-
-```python
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-
-http_archive(
-    name = "gtest",
-    url = "https://github.com/google/googletest/archive/release-1.7.0.zip",
-    sha256 = "b58cb7547a28b2c718d1e38aee18a3659c9e3ff52440297e965f5edffe34b6d0",
-    build_file = "@//:gtest.BUILD",
-    strip_prefix = "googletest-release-1.7.0",
-)
-```
-
-Then `gtest.BUILD` would look like this:
-
-```python
-cc_library(
-    name = "main",
-    srcs = glob(
-        ["src/*.cc"],
-        exclude = ["src/gtest-all.cc"]
-    ),
-    hdrs = glob([
-        "include/**/*.h",
-        "src/*.h"
-    ]),
-    copts = ["-Iexternal/gtest/include"],
-    linkopts = ["-pthread"],
-    visibility = ["//visibility:public"],
-)
-```
-
-Now `cc_` rules can depend on `@gtest//:main`.
+That's it! Now `cc_` rules can depend on `@gtest//:gtest`, or to add a `main` automatically, `@gtest//:gtest_main`.
 
 ## Writing and running C++ tests
 
@@ -209,9 +135,8 @@ Then create `./test/BUILD` file for your tests:
 cc_test(
     name = "hello-test",
     srcs = ["hello-test.cc"],
-    copts = ["-Iexternal/gtest/include"],
     deps = [
-        "@gtest//:main",
+        "@gtest//:gtest_main",
         "//main:hello-greet",
     ],
 )
